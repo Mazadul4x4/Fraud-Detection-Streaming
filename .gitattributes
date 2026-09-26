@@ -1,0 +1,7 @@
+# Store all text files with LF line endings (Linux style)
+* text=auto eol=lf
+
+# Binary files: never touch
+*.png binary
+*.jpg binary
+*.parquet binary
