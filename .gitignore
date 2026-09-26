@@ -1,0 +1,45 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Environment variables
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data
+data/raw/*
+data/processed/*
+
+# ML artifacts
+mlruns/
+models/
+*.pkl
+*.joblib
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keep empty data folders in the repo
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Large data files (GitHub limit 100 MB)
+*.csv
+*.parquet
+
+# Test / MLflow / Spark / Feast local files
+.pytest_cache/
+mlartifacts/
+spark-warehouse/
+checkpoints/
+*.db
