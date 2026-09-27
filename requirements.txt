@@ -1,0 +1,15 @@
+# --- Data & analysis ---
+pandas
+numpy
+pyarrow
+
+# --- Visualisation ---
+matplotlib
+seaborn
+
+# --- Notebooks ---
+jupyterlab
+ipykernel
+
+# --- Data download ---
+kaggle
