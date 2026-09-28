@@ -13,3 +13,6 @@ ipykernel
 
 # --- Data download ---
 kaggle
+
+# --- Testing ---
+pytest
