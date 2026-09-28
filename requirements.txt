@@ -16,3 +16,8 @@ kaggle
 
 # --- Testing ---
 pytest
+
+# --- Machine learning ---
+scikit-learn
+xgboost
+joblib
