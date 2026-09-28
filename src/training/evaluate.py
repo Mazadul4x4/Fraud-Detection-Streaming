@@ -40,3 +40,33 @@ def evaluate(y_true, scores, threshold: float = 0.5) -> dict[str, float]:
         "f1": float(f1_score(y_true, y_pred, zero_division=0)),
         "base_rate": base_rate,
     }
+
+
+def find_cost_optimal_threshold(
+    y_true,
+    scores,
+    amounts,
+    fp_cost: float = 10.0,
+    thresholds=None,
+) -> tuple[float, float]:
+    """Threshold that minimises total business cost.
+
+    Cost model: a missed fraud (false negative) costs its transaction amount;
+    a false alarm (false positive) costs `fp_cost` (review + customer friction).
+    Returns (best_threshold, total_cost_at_that_threshold).
+    """
+    y_true = np.asarray(y_true)
+    scores = np.asarray(scores)
+    amounts = np.asarray(amounts, dtype=float)
+    if thresholds is None:
+        thresholds = np.linspace(0.01, 0.99, 99)
+
+    costs = []
+    for t in thresholds:
+        flagged = scores >= t
+        missed_loss = amounts[(y_true == 1) & ~flagged].sum()
+        false_alarms = ((y_true == 0) & flagged).sum()
+        costs.append(missed_loss + fp_cost * false_alarms)
+
+    best = int(np.argmin(costs))
+    return float(thresholds[best]), float(costs[best])
