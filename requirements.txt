@@ -13,3 +13,12 @@ ipykernel
 
 # --- Data download ---
 kaggle
+
+# --- Testing ---
+pytest
+
+# --- Machine learning ---
+scikit-learn
+xgboost
+joblib
+imbalanced-learn
