@@ -45,18 +45,29 @@ def load_split(name: str, processed_dir: Path = PROCESSED_DIR) -> tuple[pd.DataF
     return df[FEATURES], df[TARGET]
 
 
-def make_preprocessor() -> ColumnTransformer:
+def make_preprocessor(
+    numeric: list[str] = NUMERIC_FEATURES,
+    categorical: list[str] = CATEGORICAL_FEATURES,
+) -> ColumnTransformer:
     """Scale numbers and one-hot encode the merchant category."""
     return ColumnTransformer(
         [
-            ("num", StandardScaler(), NUMERIC_FEATURES),
-            ("cat", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL_FEATURES),
+            ("num", StandardScaler(), numeric),
+            ("cat", OneHotEncoder(handle_unknown="ignore"), categorical),
         ]
     )
 
 
-def make_model(name: str, y_train: pd.Series) -> Pipeline:
-    """Build a full pipeline (preprocessing + classifier)."""
+def make_model(
+    name: str,
+    y_train: pd.Series,
+    numeric: list[str] = NUMERIC_FEATURES,
+    categorical: list[str] = CATEGORICAL_FEATURES,
+) -> Pipeline:
+    """Build a full pipeline (preprocessing + classifier).
+
+    `numeric` / `categorical` let experiments train on a subset of features.
+    """
     n_neg, n_pos = (y_train == 0).sum(), (y_train == 1).sum()
 
     if name == "dummy":
@@ -81,7 +92,7 @@ def make_model(name: str, y_train: pd.Series) -> Pipeline:
     else:
         raise ValueError(f"Unknown model: {name}")
 
-    return Pipeline([("preprocess", make_preprocessor()), ("model", clf)])
+    return Pipeline([("preprocess", make_preprocessor(numeric, categorical)), ("model", clf)])
 
 
 def main() -> None:
