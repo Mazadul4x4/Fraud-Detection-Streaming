@@ -178,8 +178,8 @@ Planned comparisons: baseline logistic regression vs. XGBoost vs. LightGBM · cl
 |---|---|---|
 | 0 | Repository setup, structure, Git workflow | ✅ Done |
 | 1 | Data acquisition & exploratory data analysis | ✅ Done |
-| 2 | Feature engineering, baseline model, imbalance handling | 🔄 In progress |
-| 3 | Optuna tuning + MLflow tracking & registry | ⏳ Planned |
+| 2 | Feature engineering, baseline model, imbalance handling | ✅ Done |
+| 3 | Optuna tuning + MLflow tracking & registry | 🔄 In progress |
 | 4 | FastAPI scoring service + API tests | ⏳ Planned |
 | 5 | Docker Compose (Redpanda, MLflow, Redis, API) | ⏳ Planned |
 | 6 | Streaming transaction producer | ⏳ Planned |
