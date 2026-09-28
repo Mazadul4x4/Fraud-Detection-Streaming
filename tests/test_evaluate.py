@@ -31,3 +31,20 @@ def test_recall_at_fpr_respects_limit():
     scores = np.concatenate([np.linspace(0, 0.95, 100), np.linspace(0.5, 1.0, 10)])
     # With max 1% FPR we may flag at most 1 legit transaction.
     assert 0 < recall_at_fpr(y, scores, 0.01) < 1
+
+
+def test_cost_optimal_threshold_balances_both_errors():
+    from src.training.evaluate import find_cost_optimal_threshold
+
+    # Two frauds worth $500 each, scored 0.3 and 0.9; one legit scored 0.5.
+    y = np.array([1, 1, 0])
+    scores = np.array([0.3, 0.9, 0.5])
+    amounts = np.array([500.0, 500.0, 20.0])
+
+    # Cheap false alarms: catching both frauds (threshold <= 0.3) is optimal.
+    t, cost = find_cost_optimal_threshold(y, scores, amounts, fp_cost=10)
+    assert t <= 0.3 and cost == 10
+
+    # Very expensive false alarms: better to flag only the 0.9 fraud.
+    t, cost = find_cost_optimal_threshold(y, scores, amounts, fp_cost=10_000)
+    assert 0.5 < t <= 0.9 and cost == 500
