@@ -20,7 +20,7 @@ import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
+from imblearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from xgboost import XGBClassifier
 
@@ -63,19 +63,27 @@ def make_model(
     y_train: pd.Series,
     numeric: list[str] = NUMERIC_FEATURES,
     categorical: list[str] = CATEGORICAL_FEATURES,
+    samplers: list | None = None,
+    class_weighting: bool = True,
 ) -> Pipeline:
-    """Build a full pipeline (preprocessing + classifier).
+    """Build a full pipeline: preprocessing -> optional resampling -> classifier.
 
-    `numeric` / `categorical` let experiments train on a subset of features.
+    - `numeric` / `categorical`: train on a subset of features (ablation studies).
+    - `samplers`: imbalanced-learn resamplers (e.g. SMOTE). They run ONLY during
+      `fit`, i.e. on the training data - never on validation or test data.
+    - `class_weighting`: give the rare fraud class a higher weight in the loss.
     """
     n_neg, n_pos = (y_train == 0).sum(), (y_train == 1).sum()
+    pos_weight = n_neg / n_pos if class_weighting else 1.0
 
     if name == "dummy":
         # Always predicts the base rate: the floor every real model must beat.
         clf = DummyClassifier(strategy="prior")
     elif name == "logreg":
         # class_weight="balanced": a missed fraud costs ~170x more than a false alarm.
-        clf = LogisticRegression(class_weight="balanced", max_iter=1000)
+        clf = LogisticRegression(
+            class_weight="balanced" if class_weighting else None, max_iter=1000
+        )
     elif name == "xgboost":
         clf = XGBClassifier(
             n_estimators=300,
@@ -83,7 +91,7 @@ def make_model(
             learning_rate=0.1,
             subsample=0.8,
             colsample_bytree=0.8,
-            scale_pos_weight=n_neg / n_pos,  # same idea as class_weight="balanced"
+            scale_pos_weight=pos_weight,  # same idea as class_weight="balanced"
             eval_metric="aucpr",
             tree_method="hist",
             n_jobs=-1,
@@ -92,7 +100,10 @@ def make_model(
     else:
         raise ValueError(f"Unknown model: {name}")
 
-    return Pipeline([("preprocess", make_preprocessor(numeric, categorical)), ("model", clf)])
+    steps = [("preprocess", make_preprocessor(numeric, categorical))]
+    steps += [(f"resample_{i}", sampler) for i, sampler in enumerate(samplers or [])]
+    steps.append(("model", clf))
+    return Pipeline(steps)
 
 
 def main() -> None:

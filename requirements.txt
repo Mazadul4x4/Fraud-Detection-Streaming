@@ -21,3 +21,4 @@ pytest
 scikit-learn
 xgboost
 joblib
+imbalanced-learn
