@@ -51,7 +51,7 @@ def load_champion() -> LoadedModel:
     return LoadedModel(
         model=model,
         version=str(version.version),
-        threshold=float(version.tags["threshold"]),
+        threshold=round(float(version.tags["threshold"]), 4),
         val_pr_auc=float(pr_auc) if pr_auc else None,
     )
 
