@@ -26,3 +26,8 @@ imbalanced-learn
 # --- Experiment tracking & tuning ---
 mlflow
 optuna
+
+# --- API ---
+fastapi
+uvicorn
+httpx
