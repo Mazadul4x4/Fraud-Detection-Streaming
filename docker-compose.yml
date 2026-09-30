@@ -65,6 +65,8 @@ services:
   mlflow:
     image: ghcr.io/mlflow/mlflow:v3.16.1   # same version as the Python client
     container_name: mlflow
+    environment:
+      MLFLOW_SERVER_ENABLE_JOB_EXECUTION: "false"  # no GenAI background jobs: ~1.1 GB less RAM
     command: >
       mlflow server
       --host 0.0.0.0
