@@ -181,8 +181,8 @@ Planned comparisons: baseline logistic regression vs. XGBoost vs. LightGBM · cl
 | 2 | Feature engineering, baseline model, imbalance handling | ✅ Done |
 | 3 | Optuna tuning + MLflow tracking & registry | ✅ Done |
 | 4 | FastAPI scoring service + API tests | ✅ Done |
-| 5 | Docker Compose (Redpanda, MLflow, Redis, API) | 🔄 In progress |
-| 6 | Streaming transaction producer | ⏳ Planned |
+| 5 | Docker Compose (Redpanda, MLflow, Redis, API) | ✅ Done |
+| 6 | Streaming transaction producer | 🔄 In progress |
 | 7 | PySpark Structured Streaming features | ⏳ Planned |
 | 8 | Feast feature store integration | ⏳ Planned |
 | 9 | Evidently drift monitoring + simulated drift | ⏳ Planned |
@@ -242,7 +242,7 @@ docker compose up --build
 
 | Service | URL |
 |---|---|
-| Kafka / Redpanda broker | `localhost:9092` |
+| Kafka / Redpanda broker | `localhost:19092` |
 | Redpanda Console | http://localhost:8080 |
 | MLflow UI | http://localhost:5000 |
 | Redis (online store) | `localhost:6379` |
