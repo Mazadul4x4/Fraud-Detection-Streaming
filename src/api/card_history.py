@@ -74,3 +74,24 @@ class CardHistoryStore:
 
     def __len__(self) -> int:
         return len(self._cards)
+
+    # --- State export / import (used by the Spark streaming job) -------------
+    def export_state(self, card: str) -> dict:
+        """Plain-Python snapshot of one card's state (to persist between batches)."""
+        state = self._cards[card]
+        return {
+            "recent_times": [t for (t, _) in state.recent],
+            "recent_amounts": [a for (_, a) in state.recent],
+            "last_time": state.last_time,
+            "total_count": state.total_count,
+            "total_amount": state.total_amount,
+        }
+
+    def import_state(self, card: str, snapshot: dict) -> None:
+        """Restore one card's state from `export_state` output."""
+        self._cards[card] = _CardState(
+            recent=deque(zip(snapshot["recent_times"], snapshot["recent_amounts"])),
+            last_time=snapshot["last_time"],
+            total_count=int(snapshot["total_count"]),
+            total_amount=float(snapshot["total_amount"]),
+        )

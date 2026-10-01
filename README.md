@@ -183,8 +183,8 @@ Planned comparisons: baseline logistic regression vs. XGBoost vs. LightGBM · cl
 | 4 | FastAPI scoring service + API tests | ✅ Done |
 | 5 | Docker Compose (Redpanda, MLflow, Redis, API) | ✅ Done |
 | 6 | Streaming transaction producer | ✅ Done |
-| 7 | PySpark Structured Streaming features | 🔄 In progress |
-| 8 | Feast feature store integration | ⏳ Planned |
+| 7 | PySpark Structured Streaming features | ✅ Done |
+| 8 | Feast feature store integration | 🔄 In progress |
 | 9 | Evidently drift monitoring + simulated drift | ⏳ Planned |
 | 10 | GitHub Actions CI/CD, load testing, final results | ⏳ Planned |
 | ★ | Kubernetes deployment (stretch goal) | ⏳ Planned |
@@ -267,7 +267,8 @@ kaggle datasets download -d kartik2112/fraud-detection -p data/raw --unzip
 
 ```bash
 # 1. Stream transactions into Redpanda (replays the dataset as a live stream)
-python src/ingestion/producer.py --source data/raw/fraudTest.csv --rate 200
+python -m src.ingestion.producer --limit 2000 --rate 50
+python -m src.ingestion.score_stream --max-messages 2000   # score the stream via the API
 
 # 2. Compute real-time features with Spark
 spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
@@ -366,7 +367,7 @@ pytest tests/ -m "not integration and not load"  # fast unit tests only
 
 | Test file | Covers |
 |---|---|
-| `test_ingestion.py` | Event serialisation, producer behaviour (mocked broker) |
+| `test_ingestion.py` | Contract tests: every stream event is a valid API request; labels never travel with events |
 | `test_features.py` | Correctness of windowed feature logic on small fixtures |
 | `test_training.py` | No leakage across splits, resampling on train only, end-to-end run on a tiny dataset |
 | `test_api.py` | API contract, validation errors, malformed input |

@@ -58,3 +58,28 @@ def test_exact_window_boundary_is_included():
 def test_first_transaction_defaults():
     f = CardHistoryStore().features("new-card", pd.Timestamp("2020-01-01").to_pydatetime(), 99.0)
     assert f["card_txn_count_24h"] == 0 and f["amt_vs_card_mean"] == pytest.approx(1.0)
+
+
+def test_state_export_import_roundtrip():
+    """Splitting a card's stream across batches (export -> import) gives identical features."""
+    df = random_transactions(n=200, seed=1)
+    df = df[df["cc_num"] == "A"].sort_values(["trans_date_trans_time", "trans_num"])
+    rows = [(r.trans_date_trans_time.to_pydatetime(), r.amt) for r in df.itertuples()]
+
+    one_store = CardHistoryStore()
+    expected = []
+    for t, a in rows:
+        expected.append(one_store.features("A", t, a))
+        one_store.add("A", t, a)
+
+    got, snapshot = [], None
+    for start in range(0, len(rows), 7):  # "micro-batches" of 7 transactions
+        store = CardHistoryStore()
+        if snapshot is not None:
+            store.import_state("A", snapshot)
+        for t, a in rows[start:start + 7]:
+            got.append(store.features("A", t, a))
+            store.add("A", t, a)
+        snapshot = store.export_state("A")
+
+    assert got == expected

@@ -13,5 +13,4 @@ mlartifacts/
 *.db
 notebooks/
 docs/
-tests/
 .env

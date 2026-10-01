@@ -1,0 +1,30 @@
+# Container image for the PySpark Structured Streaming feature job.
+# Build:  docker compose build spark      Run:  docker compose up -d spark
+
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYSPARK_PYTHON=python \
+    JAVA_HOME=/usr/lib/jvm/default-java
+
+# Spark runs on the JVM: Java runtime + `ps` (used by Spark's launch scripts)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends default-jre-headless procps \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements-spark.txt .
+RUN pip install --no-cache-dir -r requirements-spark.txt
+
+COPY src/ src/
+COPY tests/ tests/
+
+# Non-root user; pre-create folders so Docker volumes inherit the right owner
+RUN useradd --create-home appuser \
+    && mkdir -p /checkpoints /ivy /app/data/processed \
+    && chown -R appuser /checkpoints /ivy /app
+USER appuser
+
+CMD ["python", "-m", "src.streaming.spark_features", "--source", "kafka"]
