@@ -1,0 +1,11 @@
+# API container dependencies, pinned to the training environment versions
+fastapi==0.141.1
+numpy==2.4.6
+pandas==3.0.6
+pydantic==2.13.5
+scikit-learn==1.9.1
+scipy==1.17.1
+skops==0.16.0
+uvicorn==0.54.0
+mlflow-skinny==3.16.1
+xgboost-cpu==3.2.0
