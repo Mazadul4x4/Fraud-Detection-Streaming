@@ -1,0 +1,113 @@
+# Local infrastructure for the fraud detection platform.
+#
+#   docker compose up -d        start everything in the background
+#   docker compose ps           status + health of each service
+#   docker compose logs -f mlflow   follow one service's logs
+#   docker compose down         stop (data in named volumes is kept)
+#
+# Memory budget (tuned for an 8 GB laptop): Redpanda is capped at 512 MB and
+# MLflow runs a single worker. Check live usage with:  docker stats
+
+name: fraud-detection
+
+services:
+  # --- Streaming: Kafka-compatible broker -----------------------------------
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:latest
+    container_name: redpanda
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container          # single node, relaxed settings for laptops
+      - --smp=1
+      - --memory=512M
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      # Containers reach it at redpanda:9092, your laptop at localhost:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
+      - --default-log-level=warn
+    ports:
+      - "19092:19092"
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # --- Web UI to inspect topics and messages --------------------------------
+  redpanda-console:
+    image: docker.redpanda.com/redpandadata/console:latest
+    container_name: redpanda-console
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+    ports:
+      - "8080:8080"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  # --- Online feature store backend (used from Phase 8) ---------------------
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # --- Experiment tracking + model registry ---------------------------------
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v3.16.1   # same version as the Python client
+    container_name: mlflow
+    environment:
+      MLFLOW_SERVER_ENABLE_JOB_EXECUTION: "false"  # no GenAI background jobs: ~1.1 GB less RAM
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --workers 1
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --artifacts-destination /mlflow/artifacts
+      --allowed-hosts mlflow:5000,localhost:5000,127.0.0.1:5000
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlflow
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # --- Our fraud scoring API (built from the Dockerfile in this folder) -----
+  api:
+    build: .
+    image: fraud-detection-api:latest
+    container_name: fraud-api
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000   # container-to-container address
+      MODEL_NAME: fraud-detector
+      MODEL_ALIAS: champion
+    ports:
+      - "8000:8000"
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  redpanda-data:
+  redis-data:
+  mlflow-data:
