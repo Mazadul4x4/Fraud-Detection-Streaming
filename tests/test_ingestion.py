@@ -48,3 +48,23 @@ def test_event_values():
 def test_label_event():
     rows = list(raw_rows().itertuples(index=False))
     assert to_label_event(rows[1]) == {"transaction_id": "324cc204407e99f51b0d6ca0055005e7", "is_fraud": 1}
+
+
+def test_ensure_topics_when_topics_already_exist(monkeypatch):
+    """Regression test: re-running the producer must not crash if topics exist."""
+    import src.ingestion.producer as producer
+
+    class FakeAdmin:
+        def __init__(self, conf):
+            pass
+
+        def list_topics(self, timeout):
+            class Metadata:
+                topics = {"transactions": None, "fraud-labels": None}
+            return Metadata()
+
+        def create_topics(self, new_topics):
+            raise AssertionError("create_topics must not be called when topics exist")
+
+    monkeypatch.setattr(producer, "AdminClient", FakeAdmin)
+    producer.ensure_topics("unused:9092", ["transactions", "fraud-labels"])

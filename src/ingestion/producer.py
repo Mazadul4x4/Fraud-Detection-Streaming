@@ -43,6 +43,9 @@ def ensure_topics(bootstrap: str, topics: list[str]) -> None:
     admin = AdminClient({"bootstrap.servers": bootstrap})
     existing = admin.list_topics(timeout=10).topics
     new = [NewTopic(t, num_partitions=PARTITIONS, replication_factor=1) for t in topics if t not in existing]
+    if not new:
+        logger.info("Topics already exist: %s", ", ".join(topics))
+        return
     for topic, future in admin.create_topics(new).items():
         try:
             future.result()
@@ -52,8 +55,15 @@ def ensure_topics(bootstrap: str, topics: list[str]) -> None:
                 raise
 
 
-def load_transactions(source: Path, limit: int | None) -> pd.DataFrame:
-    df = pd.read_csv(source, usecols=RAW_COLUMNS, nrows=limit, dtype={"cc_num": "string"})
+def load_transactions(source: Path, limit: int | None, skip: int = 0) -> pd.DataFrame:
+    """Read `limit` transactions after skipping the first `skip` data rows (file is in time order)."""
+    df = pd.read_csv(
+        source,
+        usecols=RAW_COLUMNS,
+        skiprows=range(1, skip + 1),  # row 0 is the header
+        nrows=limit,
+        dtype={"cc_num": "string"},
+    )
     df["trans_date_trans_time"] = pd.to_datetime(df["trans_date_trans_time"])
     return df.sort_values("trans_date_trans_time", kind="stable").reset_index(drop=True)
 
@@ -62,13 +72,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--source", type=Path, default=RAW_DIR / "fraudTest.csv")
     parser.add_argument("--limit", type=int, default=2000, help="number of transactions (0 = all)")
+    parser.add_argument("--skip", type=int, default=0, help="skip the first N transactions (continue a replay)")
     parser.add_argument("--rate", type=float, default=50, help="messages per second (0 = as fast as possible)")
     parser.add_argument("--bootstrap", default=BOOTSTRAP)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 
     ensure_topics(args.bootstrap, [TRANSACTIONS_TOPIC, LABELS_TOPIC])
-    df = load_transactions(args.source, args.limit or None)
+    df = load_transactions(args.source, args.limit or None, args.skip)
     logger.info("Loaded %s transactions (%s -> %s), fraud rate %.2f%%",
                 f"{len(df):,}", df["trans_date_trans_time"].min(), df["trans_date_trans_time"].max(),
                 100 * df["is_fraud"].mean())

@@ -107,7 +107,32 @@ services:
       retries: 5
       start_period: 60s
 
+  # --- Real-time card features with PySpark Structured Streaming -----------
+  spark:
+    build:
+      context: .
+      dockerfile: Dockerfile.spark
+    image: fraud-detection-spark:latest
+    container_name: spark-features
+    command: python -m src.streaming.spark_features --source kafka
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092          # container-to-container address
+      FEATURES_PATH: /app/data/processed/streaming_features
+      CHECKPOINT_PATH: /checkpoints/card_features
+      IVY_HOME: /ivy                                   # Kafka connector jars cache
+      SPARK_DRIVER_MEMORY: 768m
+    volumes:
+      - ./data/processed:/app/data/processed          # feature files visible on the laptop
+      - spark-checkpoints:/checkpoints                # streaming progress + per-card state
+      - spark-ivy:/ivy
+    mem_limit: 1600m                                   # protect the 8 GB laptop
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
 volumes:
   redpanda-data:
   redis-data:
   mlflow-data:
+  spark-checkpoints:
+  spark-ivy:
