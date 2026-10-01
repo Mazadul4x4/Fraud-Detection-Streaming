@@ -182,8 +182,8 @@ Planned comparisons: baseline logistic regression vs. XGBoost vs. LightGBM · cl
 | 3 | Optuna tuning + MLflow tracking & registry | ✅ Done |
 | 4 | FastAPI scoring service + API tests | ✅ Done |
 | 5 | Docker Compose (Redpanda, MLflow, Redis, API) | ✅ Done |
-| 6 | Streaming transaction producer | 🔄 In progress |
-| 7 | PySpark Structured Streaming features | ⏳ Planned |
+| 6 | Streaming transaction producer | ✅ Done |
+| 7 | PySpark Structured Streaming features | 🔄 In progress |
 | 8 | Feast feature store integration | ⏳ Planned |
 | 9 | Evidently drift monitoring + simulated drift | ⏳ Planned |
 | 10 | GitHub Actions CI/CD, load testing, final results | ⏳ Planned |

@@ -31,3 +31,6 @@ optuna
 fastapi
 uvicorn
 httpx
+
+# --- Streaming ---
+confluent-kafka
