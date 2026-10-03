@@ -1,9 +1,8 @@
 # 🛡️ Real-Time Fraud Detection — Streaming ML & MLOps Pipeline
 
-**An end-to-end, production-style system that scores credit-card transactions for fraud in milliseconds — from live event stream to monitored model in production.**
+**An end-to-end system that scores card transactions for fraud in real time: from a Kafka event stream, through leakage-safe per-card features, to a monitored, versioned model behind an API.**
 
 [![CI](https://github.com/Mazadul4x4/Fraud-Detection-Streaming/actions/workflows/ci.yml/badge.svg)](https://github.com/Mazadul4x4/Fraud-Detection-Streaming/actions/workflows/ci.yml)
-[![Status](https://img.shields.io/badge/status-in%20active%20development-orange)](#-project-status--roadmap)
 [![Python](https://img.shields.io/badge/python-3.11-blue)](https://www.python.org/)
 [![Kafka](https://img.shields.io/badge/streaming-Kafka%20%2F%20Redpanda-black)](https://redpanda.com/)
 [![Spark](https://img.shields.io/badge/PySpark-Structured%20Streaming-E25A1C)](https://spark.apache.org/)
@@ -12,44 +11,41 @@
 [![Docker](https://img.shields.io/badge/docker-compose-2496ED)](docker-compose.yml)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-> 🎓 **Master's project** — M.Sc. Computer Science, *Data Science & Analytics* track, **EPITA (Paris, France)**.
-> 🚧 This repository is built in public, phase by phase. The [roadmap](#-project-status--roadmap) shows live progress, and the [results table](#-results) is filled **only with measured numbers** — never placeholders presented as real results.
+> 🎓 **Master's project**, M.Sc. Computer Science, *Data Science & Analytics*, **EPITA (Paris, France)**.
+> Built in public, one pull request per phase; since Phase 10 every change is gated by CI.
 
 ---
 
 ## ⚡ TL;DR
 
-- **What:** A real-time fraud detection platform: transactions stream through **Kafka/Redpanda**, features are computed live with **PySpark Structured Streaming**, served from a **Feast** feature store, scored by an **XGBoost/LightGBM** model behind a **FastAPI** microservice, and monitored for drift with **Evidently AI**.
-- **Why it's hard:** Fraud is **well under 1%** of transactions, patterns change constantly (**concept drift**), and a decision must be made in **< 50 ms** — before the payment clears.
-- **How it's solved:** Imbalance-aware training (SMOTE-Tomek / cost-sensitive learning), leakage-free **time-based validation**, **Optuna** tuning on **PR-AUC**, full experiment lineage in **MLflow**, and an automated **monitoring → retraining** loop.
-- **How it's built:** Containerised with **Docker Compose**, tested with **pytest**, and shipped through **GitHub Actions** CI — engineered with the rigor of a QA engineer with 5+ years of industry experience.
+- **What:** transactions stream through **Kafka (Redpanda)**; per-card behavioural features are computed with **one tested definition** shared by training (pandas), the **FastAPI** service (state in **Redis**) and **PySpark Structured Streaming**; an **XGBoost** model tuned with **Optuna** is versioned in **MLflow** (champion/challenger) and monitored for drift with **Evidently**.
+- **Results on the held-out test set** (6 unseen months, never used for any decision): **PR-AUC 0.969**, **recall 98.6% at a 1% false-positive rate**, fraud-related cost cut by **97.9%** (from $1.13M to $24K) with the validation-chosen threshold.
+- **Evidence over claims:** 43 unit tests + a Spark parity test in CI; online features verified **identical to training features on 5,000 real transactions**; an ablation shows real-time card history cuts false alarms **~5.6x**; load tests and drift experiments are reported honestly, including targets **not** met.
 
 ---
 
 ## 💼 What This Project Demonstrates
 
-| Area | What I built | Skills shown |
+| Area | What I built | Skills |
 |---|---|---|
-| **Data Science** | EDA, per-card behavioural features, imbalance handling, threshold selection | Statistics, feature engineering, model evaluation under imbalance |
-| **Machine Learning** | Gradient-boosted classifiers tuned with Bayesian optimisation | XGBoost, LightGBM, Optuna, scikit-learn, imbalanced-learn |
-| **Data Engineering** | Real-time ingestion and windowed stream aggregations | Kafka/Redpanda, PySpark Structured Streaming, Parquet |
-| **MLOps** | Feature store, experiment tracking, model registry, drift monitoring | Feast, MLflow, Evidently AI |
-| **Software Engineering** | Typed REST API, unit/contract/integration tests, CI/CD | FastAPI, Pydantic, pytest, GitHub Actions, Docker |
-| **Product Thinking** | Metrics tied to business cost: fraud losses vs. customer friction | Precision/recall trade-offs, cost-based thresholds |
+| **Data science** | EDA, leakage-safe per-card features, imbalance study, cost-based thresholds | Statistics, feature engineering, evaluation under imbalance |
+| **Machine learning** | XGBoost vs logistic regression vs baseline, Optuna search, ablation study | XGBoost, scikit-learn, imbalanced-learn, Optuna |
+| **Data engineering** | Kafka producer/consumers keyed by card, stateful Spark streaming | Redpanda/Kafka, PySpark Structured Streaming, Parquet |
+| **MLOps** | Model registry with champion/challenger, Redis online state, drift monitoring | MLflow, Redis, Evidently |
+| **Software engineering** | Typed API, 40+ tests incl. training/serving parity, Docker, CI | FastAPI, Pydantic, pytest, ruff, Docker, GitHub Actions |
+| **Product thinking** | Metrics tied to money and customer friction | Precision/recall trade-offs, business cost |
 
 ---
 
 ## 🎯 The Problem
 
-Card-not-present fraud costs the global economy tens of billions of dollars every year, and the window to stop a fraudulent payment is measured in **milliseconds**, not hours. Traditional batch-scored models fail here for three reasons:
+Card fraud must be stopped in **milliseconds**, before a payment clears. Three things make it hard:
 
-| Challenge | Why batch models fail | How this system responds |
+| Challenge | Why it matters | How this system responds |
 |---|---|---|
-| **Latency** | The transaction has cleared before an overnight job flags it | Pre-computed online features + in-memory model → sub-50 ms scoring |
-| **Concept drift** | Fraudsters adapt; a static model decays within days or weeks | Continuous drift monitoring with a retraining trigger |
-| **Class imbalance** | With < 1% fraud, a model predicting "never fraud" scores > 99% accuracy — and is useless | Resampling / cost-sensitive learning, evaluated with PR-AUC and recall at fixed false-positive rate |
-
-**Business goal:** catch more fraud, **without** blocking genuine customers — and give the data team full visibility into model health after deployment.
+| **Extreme imbalance** | 0.4-0.6% fraud: a model that never flags anything is "99.5% accurate" and useless | PR-AUC and recall at a fixed false-positive rate; class weighting; cost-based threshold |
+| **Fraud comes in bursts** | EDA: all frauds on a compromised card happen within ~1 h to ~3 days | Real-time per-card features (last 1h / 24h activity) from the stream |
+| **The world drifts** | Monthly fraud rate varies ~2.7x; seasonal volume shifts | Weekly drift + performance monitoring with a retrain trigger |
 
 ---
 
@@ -57,138 +53,109 @@ Card-not-present fraud costs the global economy tens of billions of dollars ever
 
 ```mermaid
 flowchart LR
-    subgraph Ingestion["1 · Ingestion"]
-        A[Transaction<br/>Simulator] -->|produce| B[(Kafka / Redpanda<br/>topic: transactions)]
+    subgraph Stream["Streaming"]
+        P[Producer<br/>replays transactions] -->|key = card number| K[(Redpanda / Kafka<br/>transactions + fraud-labels)]
     end
 
-    subgraph Processing["2 · Stream Processing"]
-        B --> C[PySpark Structured<br/>Streaming]
-        C -->|features| D[(Feast Feature Store<br/>Online: Redis<br/>Offline: Parquet)]
+    subgraph Online["Real-time scoring"]
+        K --> C[Stream scorer<br/>consumer group]
+        C -->|POST /score| A[FastAPI service]
+        A <-->|per-card state<br/>WATCH/MULTI| R[(Redis)]
+        M[(MLflow registry<br/>@champion + threshold)] -->|load at startup| A
     end
 
-    subgraph Training["3 · Training"]
-        D -->|point-in-time<br/>historical features| E[Imbalance-aware training<br/>Optuna + XGBoost/LightGBM]
-        E -->|runs, metrics,<br/>artifacts| F[(MLflow Tracking<br/>+ Model Registry)]
+    subgraph Features["Stream processing"]
+        K --> S[PySpark Structured Streaming<br/>stateful per card]
+        S --> F[(Feature table<br/>Parquet)]
     end
 
-    subgraph Serving["4 · Real-Time Serving"]
-        F -->|load @champion| G[FastAPI<br/>Scoring Service]
-        D -->|online features| G
-        G -->|fraud score + decision| H[Payment Gateway]
-    end
-
-    subgraph Monitoring["5 · Monitoring"]
-        G -->|prediction logs| I[Evidently AI<br/>Drift Reports]
-        I -->|alert| J[Retraining Trigger]
-        J --> E
+    subgraph Offline["Training and monitoring"]
+        D[(Historical data)] --> T[Preprocess + Optuna<br/>XGBoost]
+        T -->|register, promote if better| M
+        D --> B[Backfill card history] --> R
+        W[Evidently weekly monitoring] -->|retrain trigger| T
     end
 ```
 
-**Flow:** `stream → live features → feature store → imbalance-aware training → model registry → real-time scoring → drift monitoring → retraining`
-
----
-
-## 🧠 Key Engineering Decisions
-
-These are the decisions that separate a production system from a notebook experiment.
-
-**1. Time-based splits, never random shuffling.**
-Fraud data is a time series. A random split lets the model "see the future" (e.g. later transactions of the same card), producing inflated scores that collapse in production. Train, validation and test sets are split chronologically.
-
-**2. Resampling is applied to the training fold only.**
-SMOTE-Tomek creates synthetic fraud samples. Applying it before splitting would leak synthetic copies into validation/test data. Validation and test sets always keep the real class distribution.
-
-**3. PR-AUC and recall at a fixed false-positive rate — not accuracy.**
-Under extreme imbalance, accuracy and even ROC-AUC look deceptively good. PR-AUC focuses on the rare positive class, and *recall @ 1% FPR* answers the real business question: *"How much fraud do we catch while inconveniencing only 1 in 100 legitimate customers?"*
-
-**4. One feature definition for training and serving (Feast).**
-The #1 silent failure in production ML is **training/serving skew** — features computed differently offline and online. Feast serves the same feature definitions to both, with **point-in-time correct joins** to prevent label leakage.
-
-**5. Features are pre-computed, not calculated at request time.**
-Per-card aggregates (spend and transaction count over the last 1 h / 24 h, velocity, merchant diversity) are computed by the streaming job and stored in Redis. The API only performs a key lookup, which keeps p99 latency low.
-
-**6. Modern MLflow model promotion with aliases.**
-Models are promoted with registry **aliases** (`@champion`, `@challenger`) instead of the deprecated stage workflow, which enables clean rollbacks and champion/challenger comparison.
-
-**7. Monitoring without waiting for labels.**
-Fraud labels (chargebacks) arrive days or weeks late. The system therefore tracks **data drift** and **prediction drift** as early-warning proxies, and confirms **concept drift** once delayed labels arrive.
-
-**8. Quality engineering from day one.**
-Coming from 5+ years in software QA, I treat tests as part of the product: unit tests for feature logic, **contract tests** for the API (including malformed input), a tiny end-to-end training fixture, and CI that blocks merges on failure.
-
----
-
-## 🗂️ Dataset
-
-**[Credit Card Transactions Fraud Detection Dataset](https://www.kaggle.com/datasets/kartik2112/fraud-detection)** (Kaggle) — simulated card transactions with realistic customer and merchant behaviour.
-
-This dataset was chosen deliberately over the popular PCA-anonymised `creditcard.csv` dataset because it contains **card identifiers, timestamps and merchant categories** — the fields required for real-time, per-card behavioural features.
-
-| Field | Use in this project |
-|---|---|
-| `cc_num` | Card identifier → entity key for per-card streaming features |
-| `trans_date_trans_time`, `unix_time` | Event time → windowed aggregates, time-based splits |
-| `amt` | Transaction amount → spend features and drift monitoring |
-| `category`, `merchant` | Merchant context → category risk and diversity features |
-| `lat/long`, `merch_lat/merch_long` | Location → customer–merchant distance feature |
-| `is_fraud` | Target label (strongly imbalanced) |
-
-> Raw data is **not committed** to Git (size limits and good practice). See [`data/README.md`](data/README.md) for download instructions.
-
----
-
-## 🧰 Tech Stack
-
-| Layer | Tool | Why this choice |
-|---|---|---|
-| Streaming | **Kafka / Redpanda** | Industry-standard event log; Redpanda is Kafka-compatible and lightweight locally |
-| Stream processing | **PySpark Structured Streaming** | Stateful windowed aggregations with event-time semantics |
-| Online feature state | **Redis** | Per-card state read and updated per request; features computed at request time with the training code (verified identical on 5,000 real transactions). Feast was evaluated and not adopted: it pins pandas < 3 and serves window aggregates that go stale between events |
-| Modelling | **XGBoost / LightGBM** | State of the art for tabular data; native class weighting |
-| Tuning | **Optuna** | Efficient Bayesian search with pruning |
-| Imbalance | **imbalanced-learn** (SMOTE-Tomek) | Oversampling + boundary cleaning, compared against class weighting |
-| Tracking & registry | **MLflow** | Reproducible runs, artifact lineage, alias-based promotion |
-| Serving | **FastAPI** + Uvicorn + Pydantic | Async, typed, auto-generated OpenAPI docs |
-| Monitoring | **Evidently AI** | Data, target and prediction drift reports |
-| Packaging | **Docker / Docker Compose** | One-command reproducible environment |
-| CI/CD | **GitHub Actions** | Lint, test and build on every push |
-| Testing | **pytest**, Locust | Unit, contract, integration and load testing |
+The card-history features have **one definition** (`CardHistoryStore`), used by the API, the Redis store and the Spark job, and **tested to equal** the pandas training features.
 
 ---
 
 ## 📊 Results
 
-> Every number below will come from a logged MLflow run or a recorded load test. Cells marked ⏳ have not been measured yet.
+### Final evaluation on the held-out test set (Jun-Dec 2020)
+
+Champion model and its validation-chosen threshold (0.23) applied **unchanged**; the script refuses to evaluate the same model version twice, to avoid tuning on the test set.
+
+| Metric | Validation | **Test (held out)** |
+|---|---|---|
+| Transactions / fraud rate | 371,825 / 0.61% | **555,719 / 0.39%** |
+| PR-AUC | 0.9827 | **0.9691** |
+| PR-AUC lift over random | 160x | **251x** |
+| ROC-AUC | 0.9998 | **0.9992** |
+| Recall @ 1% FPR | 0.9948 | **0.9860** |
+| Precision / recall @ 0.23 | 0.79 / 0.98 | **0.73 / 0.97** |
+| False alarms (share of legitimate) | 0.163% | **0.139%** |
+| Fraud-related cost: no model -> model | $1.22M -> $16K | **$1.13M -> $24K (-97.9%)** |
+
+Lower test PR-AUC and precision come from the lower fraud rate (prior shift): lift over random rises and the false-alarm rate falls. Details: [`docs/final_results.md`](docs/final_results.md).
+
+### Targets
 
 | Metric | Target | Result |
 |---|---|---|
-| PR-AUC (primary metric) | ≥ 0.80 | ⏳ |
-| ROC-AUC | ≥ 0.95 | ⏳ |
-| Recall @ 1% FPR | ≥ 0.85 | ⏳ |
-| p99 inference latency | < 50 ms | ⏳ |
-| Throughput per replica | ≥ 500 req/s | ⏳ |
-| Drift detection lag | < 24 h from onset | ⏳ |
+| PR-AUC | >= 0.80 | **0.969** ✅ |
+| ROC-AUC | >= 0.95 | **0.999** ✅ |
+| Recall @ 1% FPR | >= 0.85 | **0.986** ✅ |
+| p99 latency | < 50 ms | 120 ms single user; 1.3-1.5 s with 20 concurrent users ❌ (laptop) |
+| Throughput | >= 500 req/s | 32 req/s (1 worker), 48 req/s (3 workers) ❌ (laptop) |
+| Drift detection | < 24 h | First weekly window (<= 4 days) ⚠️ daily label-free checks would meet it |
 
-Planned comparisons: baseline logistic regression vs. XGBoost vs. LightGBM · class weighting vs. SMOTE-Tomek · default vs. business-cost-optimised decision threshold.
+### Key experiments (validation set)
+
+| Experiment | Finding |
+|---|---|
+| Baselines | XGBoost PR-AUC 0.98 vs logistic regression 0.43 vs dummy 0.006; logistic regression has ROC-AUC 0.99 but 14% precision: **ROC-AUC misleads under imbalance** |
+| Ablation | Removing real-time card-history features: precision 0.82 -> 0.44, **~5.6x more false alarms** at similar recall: the streaming architecture pays for itself |
+| Imbalance handling | Weights, undersampling, SMOTE, SMOTE-Tomek within 0.006 PR-AUC: **threshold choice matters more than resampling** |
+| Optuna tuning | +0.0006 PR-AUC over hand-picked parameters: the model is near the data's ceiling; gains need new features |
+| Monitoring (real data) | 28 weeks, recall @ 1% FPR stays 0.95-1.0, no retrain. Data drift follows seasonal volume **without** model decay |
+| Monitoring (simulated x1.8 amounts) | Flagged in the first week via prediction drift and a recall drop (0.99 -> 0.66-0.87); confirms the model learned absolute fraud amount ranges |
+| Load test | One worker saturates at ~32 req/s (Little's law checks out); 3 workers +51% throughput; bottleneck: per-request pandas + shared 4-thread laptop |
 
 ---
 
-## 🗺️ Project Status & Roadmap
+## 🧠 Key Engineering Decisions
 
-| Phase | Scope | Status |
-|---|---|---|
-| 0 | Repository setup, structure, Git workflow | ✅ Done |
-| 1 | Data acquisition & exploratory data analysis | ✅ Done |
-| 2 | Feature engineering, baseline model, imbalance handling | ✅ Done |
-| 3 | Optuna tuning + MLflow tracking & registry | ✅ Done |
-| 4 | FastAPI scoring service + API tests | ✅ Done |
-| 5 | Docker Compose (Redpanda, MLflow, Redis, API) | ✅ Done |
-| 6 | Streaming transaction producer | ✅ Done |
-| 7 | PySpark Structured Streaming features | ✅ Done |
-| 8 | Online card state in Redis (Feast evaluated, not adopted) | ✅ Done |
-| 9 | Evidently drift monitoring + simulated drift | ✅ Done |
-| 10 | GitHub Actions CI/CD, load testing, final results | 🔄 In progress |
-| ★ | Kubernetes deployment (stretch goal) | ⏳ Planned |
+1. **Chronological splits, test set locked.** Train = 2019, validation = Jan-Jun 2020, test = Jun-Dec 2020. Every choice was made on validation; the test set was opened once.
+2. **One feature definition everywhere.** Training (pandas), API, Redis store and Spark all compute card history with the same logic, enforced by parity tests: unit tests, a Spark test across micro-batches, and an end-to-end check on 5,000 real transactions.
+3. **Leakage-safe history.** Every card feature uses only *earlier* transactions; a test proves adding future transactions never changes past features.
+4. **Kafka keyed by card number.** Per-key ordering keeps each card's transactions in sequence, which history features require. Labels travel on a separate topic, like delayed chargebacks.
+5. **Redis instead of Feast.** Feast (0.66) pins pandas < 3, and stored window aggregates go stale between events, which would break training/serving parity. The API reads each card's state, computes features at request time, and writes it back atomically (`WATCH/MULTI/EXEC`). Redis also makes multi-worker scaling correct and survives restarts.
+6. **Champion/challenger registry.** A new model becomes `@champion` only if it beats the current one on validation PR-AUC; it carries its own threshold as a version tag. In practice this kept a weaker re-tuned model out of production.
+7. **Metrics that survive imbalance and prior shift.** PR-AUC for model selection; recall @ 1% FPR as the retrain trigger, because PR-AUC also drops when fraud simply becomes rarer.
+8. **Measure, then optimise.** MLflow's background job runner was found (122 processes) and disabled: 1.6 GB -> 0.4 GB. Load tests located the real bottleneck before any optimisation.
+
+---
+
+## 🗂️ Dataset
+
+[Credit Card Transactions Fraud Detection Dataset](https://www.kaggle.com/datasets/kartik2112/fraud-detection) (Kaggle, CC0): ~1.85M simulated transactions, 983 cards, Jan 2019 - Dec 2020. Chosen over the PCA-anonymised `creditcard.csv` because it has **card IDs, timestamps and merchant categories**, required for real-time per-card features. Personal fields (name, address, gender, job) are **excluded** from the model. See [`data/README.md`](data/README.md).
+
+---
+
+## 🧰 Tech Stack
+
+| Layer | Tool |
+|---|---|
+| Streaming | Redpanda (Kafka API), confluent-kafka |
+| Stream processing | PySpark 4.2 Structured Streaming (`applyInPandasWithState`) |
+| Online state | Redis |
+| Modelling | XGBoost, scikit-learn, imbalanced-learn, Optuna |
+| Tracking & registry | MLflow 3 (server in Docker) |
+| Serving | FastAPI, Uvicorn, Pydantic |
+| Monitoring | Evidently |
+| Packaging & CI | Docker Compose, GitHub Actions, ruff, pytest, Locust |
 
 ---
 
@@ -196,229 +163,152 @@ Planned comparisons: baseline logistic regression vs. XGBoost vs. LightGBM · cl
 
 ```
 .
-├── .github/workflows/         # CI: lint + tests; Docker image build
-├── data/
-│   ├── raw/                   # Downloaded dataset (git-ignored)
-│   ├── processed/             # Engineered features (git-ignored)
-│   └── README.md              # How to obtain the data
-├── docs/                      # Architecture notes, API docs, drift reports
-├── notebooks/
-│   ├── 01_eda.ipynb           # Exploratory data analysis
-│   ├── 02_feature_engineering.ipynb
-│   └── 03_model_experiments.ipynb
+├── .github/workflows/ci.yml     # lint + tests, Spark parity test, Docker builds
+├── data/README.md               # how to download the data (data itself is git-ignored)
+├── docs/                        # model card, final results, monitoring and load-test reports
+├── notebooks/                   # 01_eda.ipynb, 02_model_experiments.ipynb
 ├── src/
-│   ├── ingestion/             # Kafka/Redpanda producer & consumer
-│   ├── streaming/             # PySpark streaming feature jobs
-│   ├── feature_store/         # Feast definitions & materialisation
-│   ├── training/              # Preprocessing, training, evaluation
-│   ├── api/                   # FastAPI app, schemas, model loader
-│   └── monitoring/            # Evidently drift reports
-├── tests/                     # Unit, contract, integration & load tests
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-└── .env.example
+│   ├── training/                # preprocess, evaluate, train, tune (Optuna+MLflow), final_evaluation
+│   ├── api/                     # FastAPI app, schemas, CardHistoryStore
+│   ├── ingestion/               # Kafka producer, stream scorer, event format
+│   ├── streaming/               # PySpark stateful feature job
+│   ├── feature_store/           # Redis card state, history backfill, parity check
+│   └── monitoring/              # Evidently drift + performance report
+├── tests/                       # unit, contract, parity tests; locustfile.py (load test)
+├── Dockerfile, Dockerfile.spark, docker-compose.yml
+├── requirements.txt, requirements-api.txt, requirements-spark.txt
+└── pyproject.toml               # ruff + pytest configuration
 ```
 
 ---
 
 ## 🚀 Quickstart
 
-> Commands describe the target interface; each section becomes runnable as its phase is completed.
+Prerequisites: Python 3.11, Docker Desktop, a Kaggle API key. Commands run from the project root (Git Bash / Linux shell).
 
-### Prerequisites
-Python 3.11 · Git · Docker Desktop · Java 17 (for PySpark) · a Kaggle account
-
-### 1. Clone and configure
 ```bash
 git clone https://github.com/Mazadul4x4/Fraud-Detection-Streaming.git
 cd Fraud-Detection-Streaming
-cp .env.example .env
-```
+python -m venv .venv && source .venv/bin/activate     # Windows Git Bash: source .venv/Scripts/activate
+pip install -r requirements.txt
 
-### 2. Option A — everything with Docker Compose
-```bash
-docker compose up --build
+kaggle datasets download -d kartik2112/fraud-detection -p data/raw --unzip
+python -m src.training.preprocess                     # features + chronological splits -> data/processed
+docker compose up -d redpanda redpanda-console redis mlflow
 ```
 
 | Service | URL |
 |---|---|
-| Kafka / Redpanda broker | `localhost:19092` |
-| Redpanda Console | http://localhost:8080 |
 | MLflow UI | http://localhost:5000 |
-| Redis (online store) | `localhost:6379` |
-| FastAPI (Swagger UI) | http://localhost:8000/docs |
+| Redpanda Console | http://localhost:8080 |
+| Kafka (from the laptop) | `localhost:19092` |
+| API docs (after step 3 below) | http://localhost:8000/docs |
 
-### 2. Option B — local development
-```bash
-python -m venv .venv
-source .venv/bin/activate          # Windows Git Bash: source .venv/Scripts/activate
-pip install -r requirements.txt
-docker compose up redpanda mlflow redis -d
-```
-
-### 3. Get the data
-```bash
-kaggle datasets download -d kartik2112/fraud-detection -p data/raw --unzip
-```
-
----
-
-## 🔄 Running the Pipeline
+### Run the pipeline
 
 ```bash
-# 1. Stream transactions into Redpanda (replays the dataset as a live stream)
+# 1. Train, tune and register the model (becomes @champion if better than the current one)
+MLFLOW_TRACKING_URI=http://localhost:5000 python -m src.training.tune --n-trials 10 --train-sample 0.3
+
+# 2. Pre-load every card's history into Redis, then verify online == training features
+python -m src.feature_store.backfill --reset
+python -m src.feature_store.verify_parity --n 5000
+
+# 3. Start the API (loads @champion and its threshold from MLflow; API_WORKERS=3 for more throughput)
+docker compose up -d --build api
+
+# 4. Stream transactions and score them live
 python -m src.ingestion.producer --limit 2000 --rate 50
-python -m src.ingestion.score_stream --max-messages 2000   # score the stream via the API
+python -m src.ingestion.score_stream --max-messages 2000
 
-# 2. Compute real-time features with Spark
-spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
-    src/streaming/spark_features.py
+# 5. Real-time features with Spark (output: data/processed/streaming_features)
+docker compose up -d spark
 
-# 3. Register and materialise features
-cd src/feature_store/feature_repo && feast apply && cd -
-python src/feature_store/materialize.py
+# 6. Weekly monitoring, optionally with a simulated drift
+MLFLOW_TRACKING_URI=http://localhost:5000 python -m src.monitoring.drift_report --inject-drift 2020-10-01
 
-# 4. Train, tune and register the model
-python src/training/train.py --model xgboost --resampling smote-tomek --n-trials 50
+# 7. One-time final evaluation on the held-out test set
+MLFLOW_TRACKING_URI=http://localhost:5000 python -m src.training.final_evaluation
 
-# 5. Serve
-uvicorn src.api.main:app --host 0.0.0.0 --port 8000
-
-# 6. Monitor drift
-python src/monitoring/drift_report.py \
-    --reference data/processed/train.parquet \
-    --current data/processed/recent_predictions.parquet \
-    --output docs/drift_report.html
+# 8. Load test
+locust -f tests/locustfile.py --host http://localhost:8000 --headless -u 20 -r 5 -t 60s --only-summary
 ```
 
 ---
 
-## 📡 API Reference
-
-### `POST /score` — score one transaction
-
-```bash
-curl -X POST http://localhost:8000/score \
-  -H "Content-Type: application/json" \
-  -d '{
-        "transaction_id": "txn_123",
-        "cc_num": "4263982640269299",
-        "amount": 249.99,
-        "category": "shopping_net",
-        "timestamp": "2020-07-01T23:15:00",
-        "customer_dob": "1985-04-12",
-        "customer_lat": 40.71,
-        "customer_long": -74.0,
-        "merchant_lat": 40.9,
-        "merchant_long": -73.8,
-        "city_pop": 8000000
-      }'
-```
-
-Response shape:
-```json
-{
-  "transaction_id": "txn_123",
-  "fraud_score": 0.0825,
-  "decision": "review",
-  "threshold": 0.06,
-  "model_version": "2",
-  "latency_ms": 12.4
-}
-```
-*(Illustrative values. `fraud_score` is a risk score, not a calibrated probability.)*
-
-**Decision rules:** `approve` if score < model threshold (cost-optimal, stored with each model
-version in MLflow); `review` (human analyst) up to 0.9; `decline` at 0.9 and above.
-
-**Per-card history** (transaction counts and amounts in the last 1h / 24h, etc.) is kept by the
-service between requests and is **unit-tested to match the training features exactly**
-(training/serving skew test).
+## 📡 API
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /score` | Real-time fraud probability and approve / review / decline decision |
-| `GET /health` | Liveness/readiness probe for Docker and Kubernetes |
-| `GET /model/info` | Loaded model version, alias and training metadata |
-
-Interactive OpenAPI docs: http://localhost:8000/docs
-
----
-
-## 📈 Monitoring & Drift Detection
-
-| Drift type | Meaning | Detection |
-|---|---|---|
-| **Data drift** | Input distributions shift (e.g. holiday spending) | Evidently `DataDriftPreset` on features |
-| **Prediction drift** | Score distribution shifts | Evidently on model outputs — early warning before labels arrive |
-| **Concept drift** | Fraud patterns change | PR-AUC on delayed labels vs. registered baseline |
-
-Weekly monitoring over the held-out period (`python -m src.monitoring.drift_report`) compares each week with the validation period. The retrain trigger is a > 5% drop in **recall @ 1% FPR**, not PR-AUC, because PR-AUC also falls when fraud simply becomes rarer. Findings: seasonal volume changes cause data drift **without** model decay (no retrain needed); a simulated x1.8 amount shift was flagged in its first week through prediction drift and a recall drop (0.99 -> 0.66-0.87), while the dataset-level drift share missed it. See `docs/monitoring_baseline.md` and `docs/monitoring_drift_experiment.md`.
-
----
-
-## ✅ Testing
+| `POST /score` | Fraud score and decision for one transaction |
+| `GET /health` | Readiness: 200 only when the model is loaded |
+| `GET /model/info` | Model version, alias, thresholds, validation PR-AUC |
 
 ```bash
-pytest tests/ -v                                 # full suite
-pytest tests/ --cov=src --cov-report=term-missing # with coverage
-pytest tests/ -m "not integration and not load"  # fast unit tests only
+curl -X POST http://localhost:8000/score -H "Content-Type: application/json" -d '{
+  "transaction_id": "txn_123", "cc_num": "4263982640269299", "amount": 249.99,
+  "category": "shopping_net", "timestamp": "2020-07-01T23:15:00", "customer_dob": "1985-04-12",
+  "customer_lat": 40.71, "customer_long": -74.0, "merchant_lat": 40.9, "merchant_long": -73.8,
+  "city_pop": 8000000}'
+```
+
+Response: `transaction_id`, `fraud_score` (a risk score, not a calibrated probability), `decision`, `threshold`, `model_version`, `latency_ms`.
+**Decisions:** `approve` below the model's threshold; `review` (human analyst) up to 0.9; `decline` from 0.9. Invalid input returns `422`.
+
+---
+
+## ✅ Testing & CI
+
+```bash
+ruff check src tests
+python -m pytest -q          # 43 tests; the Spark test is skipped where PySpark/Java are missing
 ```
 
 | Test file | Covers |
 |---|---|
-| `test_ingestion.py` | Contract tests: every stream event is a valid API request; labels never travel with events |
-| `test_features.py` | Correctness of windowed feature logic on small fixtures |
-| `test_training.py` | No leakage across splits, resampling on train only, end-to-end run on a tiny dataset |
-| `test_api.py` | API contract, validation errors, malformed input |
-| `load_test.py` | Latency and throughput benchmarks (run manually) |
+| `test_features.py` | Feature correctness, no leakage (future transactions never change past features), chronological split |
+| `test_card_history.py` | Online features == training features (400 random transactions, window boundaries, ties) |
+| `test_spark_features.py` | Spark features == training features across 4 micro-batches (runs in CI) |
+| `test_redis_state.py` | Redis parity, persistence across restarts, backfill continuation, multi-instance API |
+| `test_api.py` | API contract, decisions, validation errors (stub model) |
+| `test_ingestion.py` | Every stream event is a valid API request; labels never travel with events |
+| `test_train.py`, `test_evaluate.py`, `test_monitoring.py`, `test_final_evaluation.py` | Pipelines, metrics, drift detection, business cost |
+
+**GitHub Actions** runs three jobs on every push and pull request: lint + unit tests, the Spark parity test (Java 21), and both Docker builds.
 
 ---
 
-## ⚙️ CI/CD
+## ⚠️ Limitations
 
-- **`ci.yml`** — on every push and pull request: install dependencies → `ruff` lint → `pytest` with coverage.
-- **`docker-build.yml`** — on merge to `main`: build the API image, tagged with the commit SHA.
-
----
-
-## ☁️ Deployment Path (Cloud / Kubernetes)
-
-| Local component | Production equivalent |
-|---|---|
-| Redpanda container | Amazon MSK / Confluent Cloud / Redpanda Cloud |
-| Redis container | ElastiCache / Memorystore |
-| Local Parquet | S3 / GCS / BigQuery |
-| MLflow container | MLflow with managed Postgres + object storage |
-| Docker Compose | Kubernetes (EKS/GKE): Deployment + HPA + Ingress + CronJobs for drift checks |
-
-Secrets are managed with Kubernetes Secrets or a cloud secret manager — never committed to Git.
-
----
+- **Simulated data:** fraud patterns are unusually clean (distinct amount clusters, no fraud above ~$1,376, ~77% of cards compromised). Real-world scores would be lower; the drift experiment shows the model relies on absolute amount ranges.
+- **Scores are not calibrated probabilities** (class weighting); the threshold is tied to each model version.
+- **Laptop-bound performance:** latency and throughput targets were not met with the load generator and all services sharing 4 CPU threads.
+- **Monitoring alerts:** a dataset-level drift share missed a severe single-feature shift; key features need individual alerts.
+- The $10 false-alarm cost is an assumption; the optimal threshold depends on it.
 
 ## 🔭 Future Work
 
-- **SHAP explanations** in the `/score` response for fraud-analyst review
-- **Shadow deployment** of challenger models before promotion
-- **Fully automated retraining** triggered by drift alerts
-- **Graph features** to detect fraud rings (shared devices, merchants, locations)
+Lightweight per-request feature path (guarded by the parity tests) · replicas on dedicated hardware / Kubernetes · daily label-free drift checks with per-feature alerts · automated retraining from the monitoring trigger · SHAP explanations for analysts · graph features for fraud rings.
+
+---
+
+## 📚 Documentation
+
+[Model card](docs/model_card.md) · [Final results](docs/final_results.md) · [Monitoring baseline](docs/monitoring_baseline.md) · [Drift experiment](docs/monitoring_drift_experiment.md) · [Load test](docs/load_test_results.md) · [EDA notebook](notebooks/01_eda.ipynb) · [Model experiments](notebooks/02_model_experiments.ipynb)
 
 ---
 
 ## 👤 About the Author
 
-**Md Mazadul Islam** — Software QA Engineer (5+ years) transitioning into **Data Science & ML Engineering**, currently completing an **M.Sc. in Computer Science (Data Science & Analytics) at EPITA, Paris**.
+**Md Mazadul Islam**, Software QA Engineer (5+ years) moving into **Data Science & ML Engineering**, completing an **M.Sc. in Computer Science (Data Science & Analytics) at EPITA, Paris**.
 
-My QA background shapes how I build ML systems: reproducible environments, tests for data and models (not just code), and monitoring after release — because a model that works in a notebook but fails silently in production is a defect.
+My QA background shaped this project: tests for data and models (not just code), parity checks between environments, regression tests for every bug found, and honest reporting of what did not meet its target.
 
 - 🌐 Portfolio: [mazadul4x4.com](https://mazadul4x4.com)
-- 💼 LinkedIn: [your LinkedIn profile](https://www.linkedin.com/in/mazadulofficial/)
+- 💼 LinkedIn: [linkedin.com/in/mazadulofficial](https://www.linkedin.com/in/mazadulofficial/)
 - 🐙 GitHub: [@Mazadul4x4](https://github.com/Mazadul4x4)
 
 *Open to Data Scientist, ML Engineer and MLOps opportunities in France and Europe.*
-
----
 
 ## 📄 License
 
