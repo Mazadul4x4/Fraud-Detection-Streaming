@@ -72,6 +72,12 @@ class CardHistoryStore:
         state.total_count += 1
         state.total_amount += amount
 
+    def features_and_add(self, card: str, time: datetime, amount: float) -> dict[str, float]:
+        """Features for a new transaction, then record it (one call per scored transaction)."""
+        features = self.features(card, time, amount)
+        self.add(card, time, amount)
+        return features
+
     def __len__(self) -> int:
         return len(self._cards)
 

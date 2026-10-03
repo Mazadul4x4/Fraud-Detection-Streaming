@@ -9,3 +9,4 @@ skops==0.16.0
 uvicorn==0.54.0
 mlflow-skinny==3.16.1
 xgboost-cpu==3.2.0
+redis==8.1.0

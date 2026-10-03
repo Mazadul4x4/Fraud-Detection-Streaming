@@ -34,3 +34,7 @@ httpx
 
 # --- Streaming ---
 confluent-kafka
+
+# --- Online state store ---
+redis
+fakeredis

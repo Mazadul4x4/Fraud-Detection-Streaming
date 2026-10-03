@@ -142,7 +142,7 @@ This dataset was chosen deliberately over the popular PCA-anonymised `creditcard
 |---|---|---|
 | Streaming | **Kafka / Redpanda** | Industry-standard event log; Redpanda is Kafka-compatible and lightweight locally |
 | Stream processing | **PySpark Structured Streaming** | Stateful windowed aggregations with event-time semantics |
-| Feature store | **Feast** + Redis + Parquet | Online/offline consistency, point-in-time correctness |
+| Online feature state | **Redis** | Per-card state read and updated per request; features computed at request time with the training code (verified identical on 5,000 real transactions). Feast was evaluated and not adopted: it pins pandas < 3 and serves window aggregates that go stale between events |
 | Modelling | **XGBoost / LightGBM** | State of the art for tabular data; native class weighting |
 | Tuning | **Optuna** | Efficient Bayesian search with pruning |
 | Imbalance | **imbalanced-learn** (SMOTE-Tomek) | Oversampling + boundary cleaning, compared against class weighting |
@@ -184,8 +184,8 @@ Planned comparisons: baseline logistic regression vs. XGBoost vs. LightGBM · cl
 | 5 | Docker Compose (Redpanda, MLflow, Redis, API) | ✅ Done |
 | 6 | Streaming transaction producer | ✅ Done |
 | 7 | PySpark Structured Streaming features | ✅ Done |
-| 8 | Feast feature store integration | 🔄 In progress |
-| 9 | Evidently drift monitoring + simulated drift | ⏳ Planned |
+| 8 | Online card state in Redis (Feast evaluated, not adopted) | ✅ Done |
+| 9 | Evidently drift monitoring + simulated drift | 🔄 In progress |
 | 10 | GitHub Actions CI/CD, load testing, final results | ⏳ Planned |
 | ★ | Kubernetes deployment (stretch goal) | ⏳ Planned |
 
