@@ -42,3 +42,4 @@ fakeredis
 # --- Monitoring ---
 evidently
 tabulate
+ruff

@@ -1,0 +1,11 @@
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+# E/W: pycodestyle errors & warnings, F: pyflakes (unused imports, undefined names), I: import sorting
+select = ["E", "W", "F", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -17,10 +17,10 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
+from imblearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression
-from imblearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from xgboost import XGBClassifier
 
