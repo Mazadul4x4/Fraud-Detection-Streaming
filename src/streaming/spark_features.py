@@ -32,7 +32,12 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.streaming.state import GroupState, GroupStateTimeout
 from pyspark.sql.types import (
-    DoubleType, LongType, StringType, StructField, StructType, TimestampType,
+    DoubleType,
+    LongType,
+    StringType,
+    StructField,
+    StructType,
+    TimestampType,
 )
 
 from src.api.card_history import CardHistoryStore

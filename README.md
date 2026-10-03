@@ -2,6 +2,7 @@
 
 **An end-to-end, production-style system that scores credit-card transactions for fraud in milliseconds — from live event stream to monitored model in production.**
 
+[![CI](https://github.com/Mazadul4x4/Fraud-Detection-Streaming/actions/workflows/ci.yml/badge.svg)](https://github.com/Mazadul4x4/Fraud-Detection-Streaming/actions/workflows/ci.yml)
 [![Status](https://img.shields.io/badge/status-in%20active%20development-orange)](#-project-status--roadmap)
 [![Python](https://img.shields.io/badge/python-3.11-blue)](https://www.python.org/)
 [![Kafka](https://img.shields.io/badge/streaming-Kafka%20%2F%20Redpanda-black)](https://redpanda.com/)

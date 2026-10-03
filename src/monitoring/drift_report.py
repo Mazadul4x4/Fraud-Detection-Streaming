@@ -23,7 +23,6 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-from pathlib import Path
 
 os.environ.setdefault("EVIDENTLY_DISABLE_TELEMETRY", "1")  # no usage data sent anywhere
 
