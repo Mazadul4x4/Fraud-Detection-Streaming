@@ -43,3 +43,5 @@ mlartifacts/
 spark-warehouse/
 checkpoints/
 *.db
+reports/
+docs/monitoring_summary.md
