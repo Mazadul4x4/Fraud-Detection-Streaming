@@ -38,3 +38,7 @@ confluent-kafka
 # --- Online state store ---
 redis
 fakeredis
+
+# --- Monitoring ---
+evidently
+tabulate

@@ -185,8 +185,8 @@ Planned comparisons: baseline logistic regression vs. XGBoost vs. LightGBM · cl
 | 6 | Streaming transaction producer | ✅ Done |
 | 7 | PySpark Structured Streaming features | ✅ Done |
 | 8 | Online card state in Redis (Feast evaluated, not adopted) | ✅ Done |
-| 9 | Evidently drift monitoring + simulated drift | 🔄 In progress |
-| 10 | GitHub Actions CI/CD, load testing, final results | ⏳ Planned |
+| 9 | Evidently drift monitoring + simulated drift | ✅ Done |
+| 10 | GitHub Actions CI/CD, load testing, final results | 🔄 In progress |
 | ★ | Kubernetes deployment (stretch goal) | ⏳ Planned |
 
 ---
@@ -353,7 +353,7 @@ Interactive OpenAPI docs: http://localhost:8000/docs
 | **Prediction drift** | Score distribution shifts | Evidently on model outputs — early warning before labels arrive |
 | **Concept drift** | Fraud patterns change | PR-AUC on delayed labels vs. registered baseline |
 
-A controlled drift event is injected into the stream (`producer.py --inject-drift`) to **measure** how fast the system detects it. Retraining is triggered when PR-AUC on recent labelled data drops more than ~5% relative to the baseline.
+Weekly monitoring over the held-out period (`python -m src.monitoring.drift_report`) compares each week with the validation period. The retrain trigger is a > 5% drop in **recall @ 1% FPR**, not PR-AUC, because PR-AUC also falls when fraud simply becomes rarer. Findings: seasonal volume changes cause data drift **without** model decay (no retrain needed); a simulated x1.8 amount shift was flagged in its first week through prediction drift and a recall drop (0.99 -> 0.66-0.87), while the dataset-level drift share missed it. See `docs/monitoring_baseline.md` and `docs/monitoring_drift_experiment.md`.
 
 ---
 
