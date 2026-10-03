@@ -29,6 +29,9 @@ MODEL_ALIAS = os.getenv("MODEL_ALIAS", "champion")
 # Scores at or above this are declined outright; between the model threshold and this
 # value the transaction goes to a human analyst ("review").
 DECLINE_THRESHOLD = float(os.getenv("DECLINE_THRESHOLD", "0.9"))
+# Where per-card history lives: "memory" (this process only) or "redis" (shared, survives restarts)
+CARD_STATE_BACKEND = os.getenv("CARD_STATE_BACKEND", "memory")
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 
 @dataclass
@@ -51,7 +54,7 @@ def load_champion() -> LoadedModel:
     return LoadedModel(
         model=model,
         version=str(version.version),
-        threshold=round(float(version.tags["threshold"]), 4),
+        threshold=float(version.tags["threshold"]),
         val_pr_auc=float(pr_auc) if pr_auc else None,
     )
 
@@ -85,12 +88,25 @@ def build_features(txn: Transaction, history: dict[str, float]) -> pd.DataFrame:
     return features[FEATURES]
 
 
-def create_app(loader: Callable[[], LoadedModel] = load_champion) -> FastAPI:
+def make_card_history():
+    """Card-history backend chosen by the CARD_STATE_BACKEND environment variable."""
+    if CARD_STATE_BACKEND == "redis":
+        from src.feature_store.redis_state import RedisCardHistory
+
+        return RedisCardHistory.from_url(REDIS_URL)
+    return CardHistoryStore()
+
+
+def create_app(
+    loader: Callable[[], LoadedModel] = load_champion,
+    history_factory: Callable[[], Any] = make_card_history,
+) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.model = loader()
-        app.state.history = CardHistoryStore()
-        logger.info("Loaded %s v%s", MODEL_NAME, app.state.model.version)
+        app.state.history = history_factory()
+        logger.info("Loaded %s v%s, card state backend: %s",
+                    MODEL_NAME, app.state.model.version, type(app.state.history).__name__)
         yield
 
     app = FastAPI(
@@ -123,13 +139,13 @@ def create_app(loader: Callable[[], LoadedModel] = load_champion) -> FastAPI:
     def score(txn: Transaction, request: Request) -> ScoreResponse:
         start = time.perf_counter()
         loaded: LoadedModel = request.app.state.model
-        history: CardHistoryStore = request.app.state.history
+        history = request.app.state.history  # CardHistoryStore or RedisCardHistory
 
         ts = pd.Timestamp(txn.timestamp).tz_localize(None).to_pydatetime()
-        card_features = history.features(txn.cc_num, ts, txn.amount)
+        # Features from the card's past, then record this transaction for future ones
+        card_features = history.features_and_add(txn.cc_num, ts, txn.amount)
         X = build_features(txn, card_features)
         fraud_score = float(loaded.model.predict_proba(X)[0, 1])
-        history.add(txn.cc_num, ts, txn.amount)  # future transactions can now see this one
 
         return ScoreResponse(
             transaction_id=txn.transaction_id,

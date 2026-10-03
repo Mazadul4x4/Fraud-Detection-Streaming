@@ -47,7 +47,7 @@ services:
       redpanda:
         condition: service_healthy
 
-  # --- Online feature store backend (used from Phase 8) ---------------------
+  # --- Online card-history state for the API (Phase 8) ---------------------
   redis:
     image: redis:7-alpine
     container_name: redis
@@ -95,10 +95,14 @@ services:
       MLFLOW_TRACKING_URI: http://mlflow:5000   # container-to-container address
       MODEL_NAME: fraud-detector
       MODEL_ALIAS: champion
+      CARD_STATE_BACKEND: redis                  # card history lives in Redis, not in the API process
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
     depends_on:
       mlflow:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
