@@ -91,6 +91,8 @@ services:
     build: .
     image: fraud-detection-api:latest
     container_name: fraud-api
+    # Number of API processes. Safe to raise because card history lives in Redis (shared by all).
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --workers ${API_WORKERS:-1}
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000   # container-to-container address
       MODEL_NAME: fraud-detector
