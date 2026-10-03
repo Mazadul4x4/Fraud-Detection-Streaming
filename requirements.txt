@@ -43,3 +43,4 @@ fakeredis
 evidently
 tabulate
 ruff
+locust
